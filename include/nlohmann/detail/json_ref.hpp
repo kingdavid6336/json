@@ -1,14 +1,23 @@
+//     __ _____ _____ _____
+//  __|  |   __|     |   | |  JSON for Modern C++
+// |  |  |__   |  |  | | | |  version 3.12.0
+// |_____|_____|_____|_|___|  https://github.com/nlohmann/json
+//
+// SPDX-FileCopyrightText: 2013-2026 Niels Lohmann <https://nlohmann.me>
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <initializer_list>
 #include <utility>
 
+#include <nlohmann/detail/abi_macros.hpp>
 #include <nlohmann/detail/meta/type_traits.hpp>
 
-namespace nlohmann
-{
+NLOHMANN_JSON_NAMESPACE_BEGIN
 namespace detail
 {
+
 template<typename BasicJsonType>
 class json_ref
 {
@@ -25,6 +34,7 @@ class json_ref
 
     json_ref(std::initializer_list<json_ref> init)
         : owned_value(init)
+        , braced_list(true)
     {}
 
     template <
@@ -60,9 +70,18 @@ class json_ref
         return &** this;
     }
 
+    /// whether the value was written as a braced list, such as {"key", 1},
+    /// rather than given as a value
+    bool is_braced_list() const noexcept
+    {
+        return braced_list;
+    }
+
   private:
     mutable value_type owned_value = nullptr;
     value_type const* value_ref = nullptr;
+    bool braced_list = false;
 };
+
 }  // namespace detail
-}  // namespace nlohmann
+NLOHMANN_JSON_NAMESPACE_END

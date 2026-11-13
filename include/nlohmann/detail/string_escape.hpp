@@ -1,35 +1,39 @@
+//     __ _____ _____ _____
+//  __|  |   __|     |   | |  JSON for Modern C++
+// |  |  |__   |  |  | | | |  version 3.12.0
+// |_____|_____|_____|_|___|  https://github.com/nlohmann/json
+//
+// SPDX-FileCopyrightText: 2013-2026 Niels Lohmann <https://nlohmann.me>
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
-#include <string>
-#include <nlohmann/detail/macro_scope.hpp>
+#include <cstddef> // size_t
+#include <utility> // move
 
-namespace nlohmann
-{
+#include <nlohmann/detail/abi_macros.hpp>
+
+NLOHMANN_JSON_NAMESPACE_BEGIN
 namespace detail
 {
 
-/*!
-@brief replace all occurrences of a substring by another string
-
-@param[in,out] s  the string to manipulate; changed so that all
-               occurrences of @a f are replaced with @a t
-@param[in]     f  the substring to replace with @a t
-@param[in]     t  the string to replace @a f
-
-@pre The search string @a f must not be empty. **This precondition is
-enforced with an assertion.**
-
-@since version 2.0.0
-*/
-inline void replace_substring(std::string& s, const std::string& f,
-                              const std::string& t)
+/// append @a s to @a out, escaped like @ref escape does
+template<typename StringType>
+inline void escape_into(StringType& out, const StringType& s)
 {
-    JSON_ASSERT(!f.empty());
-    for (auto pos = s.find(f);                // find first occurrence of f
-            pos != std::string::npos;         // make sure f was found
-            s.replace(pos, f.size(), t),      // replace with t, and
-            pos = s.find(f, pos + t.size()))  // find next occurrence of f
-    {}
+    const std::size_t size = s.size();
+    std::size_t run = 0;
+    for (std::size_t i = 0; i < size; ++i)
+    {
+        const char c = s[i];
+        if (c == '~' || c == '/')
+        {
+            out.append(s.data() + run, i - run);
+            out.append(c == '~' ? "~0" : "~1", 2);
+            run = i + 1;
+        }
+    }
+    out.append(s.data() + run, size - run);
 }
 
 /*!
@@ -38,26 +42,72 @@ inline void replace_substring(std::string& s, const std::string& f,
  * @return    escaped string
  *
  * Note the order of escaping "~" to "~0" and "/" to "~1" is important.
+ *
+ * The string is rebuilt in a single pass, appending whole runs between the
+ * characters that need escaping, while repeated replace() calls would move
+ * the tail of the string once per escaped character. @ref escape_into appends
+ * the escaped string to an existing one.
  */
-inline std::string escape(std::string s)
+template<typename StringType>
+inline StringType escape(const StringType& s)
 {
-    replace_substring(s, "~", "~0");
-    replace_substring(s, "/", "~1");
-    return s;
+    // a single scan for both special characters; nothing to escape is the common case
+    const std::size_t size = s.size();
+    std::size_t i = 0;
+    while (i < size && s[i] != '~' && s[i] != '/')
+    {
+        ++i;
+    }
+    if (i == size)
+    {
+        return s;
+    }
+
+    StringType result;
+    result.reserve(size + 2);
+    escape_into(result, s);
+    return result;
 }
 
 /*!
  * @brief string unescaping as described in RFC 6901 (Sect. 4)
- * @param[in] s string to unescape
- * @return    unescaped string
+ * @param[in,out] s string to unescape in place
  *
  * Note the order of escaping "~1" to "/" and "~0" to "~" is important.
+ *
+ * Rebuilt in a single pass, see @ref escape. A "~" that is followed by
+ * neither "0" nor "1" is passed through unchanged; @ref json_pointer rejects
+ * such input before it gets here.
  */
-static void unescape(std::string& s)
+template<typename StringType>
+inline void unescape(StringType& s)
 {
-    replace_substring(s, "~1", "/");
-    replace_substring(s, "~0", "~");
+    auto pos = s.find_first_of('~', 0);
+
+    StringType result;
+    result.reserve(s.size());
+
+    std::size_t run = 0;
+    while (pos != StringType::npos)
+    {
+        result.append(s.data() + run, pos - run);
+
+        const auto next = pos + 1;
+        if (next < s.size() && (s[next] == '0' || s[next] == '1'))
+        {
+            result.append(s[next] == '0' ? "~" : "/", 1);
+            run = pos + 2;
+        }
+        else
+        {
+            result.append("~", 1);
+            run = pos + 1;
+        }
+        pos = s.find_first_of('~', run);
+    }
+    result.append(s.data() + run, s.size() - run);
+    s = std::move(result);
 }
 
-} // namespace detail
-} // namespace nlohmann
+}  // namespace detail
+NLOHMANN_JSON_NAMESPACE_END

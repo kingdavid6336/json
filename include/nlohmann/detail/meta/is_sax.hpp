@@ -1,16 +1,25 @@
+//     __ _____ _____ _____
+//  __|  |   __|     |   | |  JSON for Modern C++
+// |  |  |__   |  |  | | | |  version 3.12.0
+// |_____|_____|_____|_|___|  https://github.com/nlohmann/json
+//
+// SPDX-FileCopyrightText: 2013-2026 Niels Lohmann <https://nlohmann.me>
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
-#include <cstdint> // size_t
+#include <cstddef> // size_t
 #include <utility> // declval
 #include <string> // string
 
+#include <nlohmann/detail/abi_macros.hpp>
 #include <nlohmann/detail/meta/detected.hpp>
 #include <nlohmann/detail/meta/type_traits.hpp>
 
-namespace nlohmann
-{
+NLOHMANN_JSON_NAMESPACE_BEGIN
 namespace detail
 {
+
 template<typename T>
 using null_function_t = decltype(std::declval<T&>().null());
 
@@ -62,37 +71,6 @@ using parse_error_function_t = decltype(std::declval<T&>().parse_error(
         std::declval<const Exception&>()));
 
 template<typename SAX, typename BasicJsonType>
-struct is_sax
-{
-  private:
-    static_assert(is_basic_json<BasicJsonType>::value,
-                  "BasicJsonType must be of type basic_json<...>");
-
-    using number_integer_t = typename BasicJsonType::number_integer_t;
-    using number_unsigned_t = typename BasicJsonType::number_unsigned_t;
-    using number_float_t = typename BasicJsonType::number_float_t;
-    using string_t = typename BasicJsonType::string_t;
-    using binary_t = typename BasicJsonType::binary_t;
-    using exception_t = typename BasicJsonType::exception;
-
-  public:
-    static constexpr bool value =
-        is_detected_exact<bool, null_function_t, SAX>::value &&
-        is_detected_exact<bool, boolean_function_t, SAX>::value &&
-        is_detected_exact<bool, number_integer_function_t, SAX, number_integer_t>::value &&
-        is_detected_exact<bool, number_unsigned_function_t, SAX, number_unsigned_t>::value &&
-        is_detected_exact<bool, number_float_function_t, SAX, number_float_t, string_t>::value &&
-        is_detected_exact<bool, string_function_t, SAX, string_t>::value &&
-        is_detected_exact<bool, binary_function_t, SAX, binary_t>::value &&
-        is_detected_exact<bool, start_object_function_t, SAX>::value &&
-        is_detected_exact<bool, key_function_t, SAX, string_t>::value &&
-        is_detected_exact<bool, end_object_function_t, SAX>::value &&
-        is_detected_exact<bool, start_array_function_t, SAX>::value &&
-        is_detected_exact<bool, end_array_function_t, SAX>::value &&
-        is_detected_exact<bool, parse_error_function_t, SAX, exception_t>::value;
-};
-
-template<typename SAX, typename BasicJsonType>
 struct is_sax_static_asserts
 {
   private:
@@ -109,8 +87,6 @@ struct is_sax_static_asserts
   public:
     static_assert(is_detected_exact<bool, null_function_t, SAX>::value,
                   "Missing/invalid function: bool null()");
-    static_assert(is_detected_exact<bool, boolean_function_t, SAX>::value,
-                  "Missing/invalid function: bool boolean(bool)");
     static_assert(is_detected_exact<bool, boolean_function_t, SAX>::value,
                   "Missing/invalid function: bool boolean(bool)");
     static_assert(
@@ -145,5 +121,6 @@ struct is_sax_static_asserts
         "Missing/invalid function: bool parse_error(std::size_t, const "
         "std::string&, const exception&)");
 };
+
 }  // namespace detail
-}  // namespace nlohmann
+NLOHMANN_JSON_NAMESPACE_END

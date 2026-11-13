@@ -1,18 +1,35 @@
+//     __ _____ _____ _____
+//  __|  |   __|     |   | |  JSON for Modern C++
+// |  |  |__   |  |  | | | |  version 3.12.0
+// |_____|_____|_____|_|___|  https://github.com/nlohmann/json
+//
+// SPDX-FileCopyrightText: 2013-2026 Niels Lohmann <https://nlohmann.me>
+// SPDX-FileCopyrightText: 2018 The Abseil Authors
+// SPDX-License-Identifier: MIT AND Apache-2.0
+
 #pragma once
 
 #include <cstddef> // size_t
-#include <type_traits> // conditional, enable_if, false_type, integral_constant, is_constructible, is_integral, is_same, remove_cv, remove_reference, true_type
+#include <type_traits> // conditional, enable_if, false_type, integral_constant, is_arithmetic, is_constructible, is_integral, is_same, remove_cv, remove_reference, true_type
 #include <utility> // index_sequence, make_index_sequence, index_sequence_for
 
 #include <nlohmann/detail/macro_scope.hpp>
 
-namespace nlohmann
-{
+#ifdef JSON_HAS_CPP_17
+    #include <algorithm> // clamp
+#endif
+
+NLOHMANN_JSON_NAMESPACE_BEGIN
 namespace detail
 {
 
-template<typename T>
-using uncvref_t = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+#ifdef __cpp_lib_remove_cvref
+    template<typename T>
+    using uncvref_t = std::remove_cvref_t<T>;
+#else
+    template<typename T>
+    using uncvref_t = typename std::remove_cv<typename std::remove_reference<T>::type>::type;
+#endif
 
 #ifdef JSON_HAS_CPP_14
 
@@ -144,11 +161,27 @@ template<> struct priority_tag<0> {};
 template<typename T>
 struct static_const
 {
-    static constexpr T value{};
+    static JSON_INLINE_VARIABLE constexpr T value{};
 };
 
-template<typename T>
-constexpr T static_const<T>::value;
+#ifndef JSON_HAS_CPP_17
+    template<typename T>
+    constexpr T static_const<T>::value;
+#endif
+
+/// @a v bounded to [@a lo, @a hi] (requires !(hi < lo)); like std::clamp,
+/// but by value, so that static constexpr members can be passed without an
+/// out-of-line definition before C++17
+template<typename T, enable_if_t<std::is_arithmetic<T>::value, int> = 0>
+constexpr T clamp(T v, T lo, T hi) noexcept
+{
+#ifdef __cpp_lib_clamp
+    return std::clamp(v, lo, hi);
+#else
+    // NOLINTNEXTLINE(readability-avoid-nested-conditional-operator): a constant expression of C++11
+    return v < lo ? lo : (hi < v ? hi : v);
+#endif
+}
 
 }  // namespace detail
-}  // namespace nlohmann
+NLOHMANN_JSON_NAMESPACE_END
